@@ -1,2 +1,2 @@
-# random_mouse_moving_app
+# mouse pointer moving app 
 moves the mouse pointer about in random fashion
