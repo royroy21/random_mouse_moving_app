@@ -7,20 +7,20 @@ import pyautogui
 class Mouse:
 
     speed = 20
-
     screen_width = None
     screen_height = None
-    not_move = None
+    limit_move = None
 
     def start(self):
         self.screen_width, self.screen_height = pyautogui.size()
         self.center_pointer(pyautogui)
-        next_move = self.move(self.move_down)
+        is_new_move, next_move = self.move(self.move_down)
         while 1:
             self.reverse_direction(pyautogui)
-            next_move = self.move(next_move)
+            is_new_move, next_move = self.move(next_move)
+            if is_new_move:
+                self.change_speed()
             next_move(pyautogui)
-            self.change_speed()
 
     def center_pointer(self, pyautogui):
         pyautogui.moveTo(self.screen_width / 2, self.screen_height / 2)
@@ -32,17 +32,17 @@ class Mouse:
             self.move_left,
             self.move_right,
         ]
-        if self.not_move:
-            moves.remove(self.not_move)
+        if self.limit_move:
+            moves.remove(self.limit_move)
 
         if random.choice(range(10)) == 1:
             next_move = random.choice(moves)
-            return next_move
+            return True, next_move
 
-        if self.not_move == current_move:
-            return self.get_opposite_direction(current_move)
+        if self.limit_move == current_move:
+            return True, self.get_opposite_direction(current_move)
 
-        return current_move
+        return False, current_move
 
     def get_opposite_direction(self, direction):
         opposite_move_map = {
@@ -66,32 +66,31 @@ class Mouse:
         pyautogui.moveRel(self.speed, None)
 
     def change_speed(self):
-        if random.choice(range(5)) == 1:
-            self.speed = random.choice(range(20, 50))
+        self.speed = random.choice([20, 30, 40, 50, 60])
 
     def reverse_direction(self, pyautogui):
         x, y = pyautogui.position()
 
         if y < 50:
-            self.not_move = self.get_opposite_direction(self.move_down)
+            self.limit_move = self.get_opposite_direction(self.move_down)
             self.move_down(pyautogui)
 
         elif y > (self.screen_height - 50):
-            self.not_move = self.get_opposite_direction(self.move_up)
+            self.limit_move = self.get_opposite_direction(self.move_up)
             self.move_up(pyautogui)
 
         elif x < 50:
-            self.not_move = self.get_opposite_direction(self.move_right)
+            self.limit_move = self.get_opposite_direction(self.move_right)
             self.move_right(pyautogui)
 
         elif x > (self.screen_width - 50):
-            self.not_move = self.get_opposite_direction(self.move_left)
+            self.limit_move = self.get_opposite_direction(self.move_left)
             self.move_left(pyautogui)
 
 
 class App:
 
-    window_title = "Welcome to CazMouse\u2122"
+    window_title = ""
     help_text = "To end program move mouse pointer \nto the top left corner of your screen"
     start_button_text = "Start moving the mouse pointer?"
     window_background_colour = "#4f4e4e"
@@ -121,9 +120,12 @@ class App:
         return window
 
     def center_window(self, window):
-        window.eval(
-            'tk::PlaceWindow {} center'.format(
-                window.winfo_pathname(window.winfo_id())))
+        window.update_idletasks()
+        width = window.winfo_width()
+        height = window.winfo_height()
+        x = (window.winfo_screenwidth() // 2) - (width // 2)
+        y = (window.winfo_screenheight() // 2) - (height // 2)
+        window.geometry('{}x{}+{}+{}'.format(width, height, x, y))
 
     def create_label(self, window, text):
         label = tkinter.Label(window, text=text)
