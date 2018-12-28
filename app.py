@@ -8,19 +8,21 @@ import pyautogui
 
 class Mouse:
 
+    pointer_speeds = [5, 10, 20, 30, 40, 50, 60]
+    click_mouse_intervals = [1, 2, 3, 4, 5]
+
     speed = 20
     screen_width = None
     screen_height = None
     limit_move = None
-    start_time = None
-    click_mouse_interval = 3
+    mouse_click_timer = None
     last_position = None
-
     number_of_clicks = 0
     number_of_turns = 0
     number_of_pixels_moved = 0
+    time = None
 
-    def start(self):
+    def _start(self):
         self.screen_width, self.screen_height = pyautogui.size()
         self.center_pointer(pyautogui)
 
@@ -28,6 +30,7 @@ class Mouse:
         self.number_of_pixels_moved = sum(self.last_position)
 
         is_new_move, next_move = self.move(self.move_down)
+
         while 1:
             self.reverse_direction(pyautogui)
             is_new_move, next_move = self.move(next_move)
@@ -38,36 +41,46 @@ class Mouse:
             if self.get_click_mouse_required():
                 pyautogui.click()
 
-            self.get_number_of_pixels_moved()
+            self.add_number_of_pixels_moved()
 
-    def get_number_of_pixels_moved(self):
-        last_x, last_y = self.last_position
-        new_x, new_y = pyautogui.position()
-
-        moved = None
-        if last_x != new_x:
-            moved = abs(last_x - new_x)
-        elif last_y != new_y:
-            moved = abs(last_y - new_y)
-
-        if moved:
-            self.number_of_pixels_moved += moved
+    def start(self):
+        self.mouse_click_timer = None
+        self._start()
 
     def start_with_clicks(self):
-        self.start_time = time.time()
-        self.start()
+        self.mouse_click_timer = time.time()
+        self._start()
 
     def get_click_mouse_required(self):
-        if not self.start_time:
+        if not self.mouse_click_timer:
             return False
 
         time_since_start = time.time()
-        if (time_since_start - self.start_time) > self.click_mouse_interval:
-            self.start_time = time.time()
+        click_mouse_interval = random.choice(self.click_mouse_intervals)
+        if (time_since_start - self.mouse_click_timer) > click_mouse_interval:
+            self.mouse_click_timer = time.time()
             self.number_of_clicks += 1
             return True
         else:
             return False
+
+    def add_number_of_pixels_moved(self):
+        old_x, old_y = self.last_position
+        new_x, new_y = pyautogui.position()
+
+        moved = None
+        if old_x > new_x:
+            moved = old_x - new_x
+        elif new_x > old_x:
+            moved = new_x - old_x
+        elif old_y > new_y:
+            moved = old_y - new_y
+        elif new_y > old_y:
+            moved = new_y - old_y
+
+        if moved:
+            self.number_of_pixels_moved += moved
+            self.last_position = (new_x, new_y)
 
     def center_pointer(self, pyautogui):
         pyautogui.moveTo(self.screen_width / 2, self.screen_height / 2)
@@ -116,7 +129,7 @@ class Mouse:
         pyautogui.moveRel(self.speed, None)
 
     def change_speed(self):
-        self.speed = random.choice([20, 30, 40, 50, 60])
+        self.speed = random.choice(self.pointer_speeds)
 
     def reverse_direction(self, pyautogui):
         x, y = pyautogui.position()
@@ -140,37 +153,41 @@ class Mouse:
 
 class App:
 
-    window_title = "CazMouse"
+    root = tkinter.Tk()
+    mouse_program = Mouse()
+    mouse_pointer_stats = None
+
+    title = "CazMouse"
     help_text = "To end program move mouse pointer \nto the top left corner of your screen"
-    start_button_text = "Start (moving mouse pointer)?"
-    start_with_clicks_button_text = "Start (with mouse clicks)?"
-    window_background_colour = "#4f4e4e"
-    window_size = "300x150"
-    label_foreground_colour = "#ffffff"
+    start_button_text = "Start (moving mouse pointer)"
+    start_with_clicks_button_text = "Start (**with mouse clicks)"
+
+    size = "305x180"
+    font = 'Helvetica 16 bold'
+
+    background_colour = "#4f4e4e"
+    label_foreground_colour = "#000000"
+    stats_foreground_colour = "#b7ffb5"
     stats_background_colour = '#000000'
 
-    mouse_program = Mouse()
-
     def __init__(self):
-        self.window = tkinter.Tk()
         self.mouse_stats = tkinter.StringVar()
         self.mouse_stats.set('')
-        self.mouse_pointer_stats = None
 
     def run(self):
         self.create_window()
         while 1:
-            self.window.after(1, self.update_stats)
-            self.window.update_idletasks()
-            self.window.attributes('-topmost', True)
-            self.window.update()
-            self.window.attributes('-topmost', False)
+            self.root.after(1, self.update_stats)
+            self.root.update_idletasks()
+            self.root.attributes('-topmost', True)
+            self.root.update()
+            self.root.attributes('-topmost', False)
 
     def create_window(self):
         self.center_window()
-        self.window.title(self.window_title)
-        self.window.configure(background=self.window_background_colour)
-        self.window.geometry(self.window_size)
+        self.root.title(self.title)
+        self.root.configure(background=self.background_colour)
+        self.root.geometry(self.size)
 
         label = self.create_label(self.help_text)
         label.pack()
@@ -199,47 +216,58 @@ class App:
         thread.start()
 
     def update_stats(self):
+        number_of_pixels_moved = \
+            f'pixels covered: {self.mouse_program.number_of_pixels_moved}'
+        number_of_clicks = \
+            f'number of clicks: {self.mouse_program.number_of_clicks}'
+        number_of_turns = \
+            f'number of turns: {self.mouse_program.number_of_turns}'
         self.mouse_stats.set(
-            'distance covered: {}\n number of clicks: {}\nnumber of turns: {}'.format(
-                self.mouse_program.number_of_pixels_moved,
-                self.mouse_program.number_of_clicks,
-                self.mouse_program.number_of_turns,
+            '{}\n{}\n{}'.format(
+                number_of_pixels_moved,
+                number_of_clicks,
+                number_of_turns,
                 )
             )
         self.mouse_pointer_stats.update_idletasks()
 
     def center_window(self):
-        self.window.update_idletasks()
-        width = self.window.winfo_width()
-        height = self.window.winfo_height()
-        x = (self.window.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.window.winfo_screenheight() // 2) - (height // 2)
-        self.window.geometry('{}x{}+{}+{}'.format(width, height, x, y))
+        self.root.update_idletasks()
+        width = self.root.winfo_width()
+        height = self.root.winfo_height()
+        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.root.winfo_screenheight() // 2) - (height // 2)
+        self.root.geometry('{}x{}+{}+{}'.format(width, height, x, y))
 
     def create_label(self, text):
-        label = tkinter.Label(self.window, text=text)
+        label = tkinter.Label(self.root, text=text)
         label.configure(
-            background=self.window_background_colour,
+            background=self.background_colour,
             foreground=self.label_foreground_colour,
+            font=self.font,
         )
         return label
 
     def create_stats(self, text):
-        label = tkinter.Label(self.window, textvariable=text)
+        label = tkinter.Label(self.root, textvariable=text)
         label.configure(
-            padx=100,
+            padx=50,
             background=self.stats_background_colour,
-            foreground=self.label_foreground_colour,
+            foreground=self.stats_foreground_colour,
+            font=self.font,
+            borderwidth=10,
+            relief=tkinter.SUNKEN,
         )
         return label
 
     def create_button(self, name, command):
         button = tkinter.Button(
-            self.window,
+            self.root,
             text=name,
-            highlightbackground=self.window_background_colour,
-            width=25,
-            command=command
+            highlightbackground=self.background_colour,
+            width=30,
+            command=command,
+            font=self.font,
         )
         return button
 
