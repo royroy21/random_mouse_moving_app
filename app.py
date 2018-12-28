@@ -11,6 +11,7 @@ class Mouse:
     pointer_speeds = [5, 10, 20, 30, 40, 50, 60]
     click_mouse_intervals = [1, 2, 3, 4, 5]
 
+    is_active = False
     speed = 20
     screen_width = None
     screen_height = None
@@ -23,6 +24,8 @@ class Mouse:
     time = None
 
     def _start(self):
+        self.is_active = True
+
         self.screen_width, self.screen_height = pyautogui.size()
         self.center_pointer(pyautogui)
 
@@ -31,17 +34,20 @@ class Mouse:
 
         is_new_move, next_move = self.move(self.move_down)
 
-        while 1:
-            self.reverse_direction(pyautogui)
-            is_new_move, next_move = self.move(next_move)
-            if is_new_move:
-                self.change_speed()
-            next_move(pyautogui)
+        while self.is_active:
+            try:
+                self.reverse_direction(pyautogui)
+                is_new_move, next_move = self.move(next_move)
+                if is_new_move:
+                    self.change_speed()
+                next_move(pyautogui)
 
-            if self.get_click_mouse_required():
-                pyautogui.click()
+                if self.get_click_mouse_required():
+                    pyautogui.click()
 
-            self.add_number_of_pixels_moved()
+                self.add_number_of_pixels_moved()
+            except pyautogui.FailSafeException:
+                self.is_active = False
 
     def start(self):
         self.mouse_click_timer = None
@@ -170,6 +176,9 @@ class App:
     stats_foreground_colour = "#b7ffb5"
     stats_background_colour = '#000000'
 
+    start_button = None
+    start_button_with_clicks = None
+
     def __init__(self):
         self.mouse_stats = tkinter.StringVar()
         self.mouse_stats.set('')
@@ -182,6 +191,8 @@ class App:
             self.root.attributes('-topmost', True)
             self.root.update()
             self.root.attributes('-topmost', False)
+            if not self.mouse_program.is_active:
+                self.enable_buttons()
 
     def create_window(self):
         self.center_window()
@@ -195,25 +206,39 @@ class App:
         self.mouse_pointer_stats = self.create_stats(self.mouse_stats)
         self.mouse_pointer_stats.pack()
 
-        start_button = self.create_button(
+        self.start_button = self.create_button(
             self.start_button_text,
             self.create_move_mouse_thread,
         )
-        start_button.pack()
+        self.start_button.pack()
 
-        start_button_with_clicks = self.create_button(
+        self.start_button_with_clicks = self.create_button(
             self.start_with_clicks_button_text,
             self.create_move_mouse_with_clicks_thread,
         )
-        start_button_with_clicks.pack()
+        self.start_button_with_clicks.pack()
 
     def create_move_mouse_thread(self):
         thread = Thread(target=self.mouse_program.start)
         thread.start()
+        self.disable_buttons()
 
     def create_move_mouse_with_clicks_thread(self):
         thread = Thread(target=self.mouse_program.start_with_clicks)
         thread.start()
+        self.disable_buttons()
+
+    def _change_buttons_state(self, new_state):
+        self.start_button['state'] = new_state
+        self.start_button_with_clicks['state'] = new_state
+        self.start_button.update_idletasks()
+        self.start_button_with_clicks.update_idletasks()
+
+    def disable_buttons(self):
+        self._change_buttons_state(tkinter.DISABLED)
+
+    def enable_buttons(self):
+        self._change_buttons_state(tkinter.NORMAL)
 
     def update_stats(self):
         number_of_pixels_moved = \
